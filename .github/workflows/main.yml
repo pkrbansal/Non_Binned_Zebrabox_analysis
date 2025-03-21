@@ -9,11 +9,21 @@ jobs:
       with:
         python-version: '3.9'
         architecture: 'x64'
-    - name: Install dependencies and build
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt5 pandas numpy matplotlib opencv-python openpyxl pyinstaller
-        pyinstaller --name DanioAnalyzer --windowed main_window.py
+        pip install PyQt5==5.15.9
+        pip install PyQtWebEngine==5.15.6
+        pip install pandas numpy matplotlib opencv-python openpyxl
+        pip install plotly
+        pip install pillow
+        pip install pyinstaller
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --name DanioAnalyzer --windowed --add-data "*.png;." --add-data "*.ico;." --icon=app_icon.ico --hidden-import matplotlib.backends.backend_qt5agg --hidden-import matplotlib.backends.backend_qt5 --hidden-import matplotlib.backends.qt_editor.figureoptions --hidden-import matplotlib.widgets --hidden-import matplotlib.figure --hidden-import matplotlib.backends.qt_compat --hidden-import matplotlib.backend_tools --hidden-import plotly.graph_objects --hidden-import plotly.io --hidden-import plotly.subplots main_window.py
+    - name: Check Output Directory
+      run: |
+        dir dist\DanioAnalyzer
     - uses: actions/upload-artifact@v4
       with:
         name: DanioAnalyzer
