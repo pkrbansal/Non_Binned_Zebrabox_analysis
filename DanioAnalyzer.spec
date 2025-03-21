@@ -1,8 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-
-
 a = Analysis(
-    ['D:\Behavioral genetics_V1\Metamorph_scans\ZebraBox_Tejia\Behavior_data_070124_Pushkar\ZebraBox\Tejia_behavior_code_V1\Non-Binned_app_Zebrabox\main_window.py'],
+    ['D:\Behavioral genetics_V1\Metamorph_scans\ZebraBox_Tejia\Behavior_data_070124_Pushkar\ZebraBox\Tejia_behavior_code_Non_Binned\code with plotly\main_window.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -11,14 +9,26 @@ a = Analysis(
         'numpy',
         'matplotlib',
         'matplotlib.backends.backend_qt5agg',
+        'matplotlib.backends.backend_qt5',
+        'matplotlib.backends.qt_editor.figureoptions',
+        'matplotlib.widgets',
+        'matplotlib.figure',
+        'matplotlib.backends.qt_compat',
+        'matplotlib.backend_tools',
         'PyQt5',
         'PyQt5.QtWidgets',
         'PyQt5.QtCore',
         'PyQt5.QtGui',
+        'PyQt5.QtWebEngineWidgets',
         'cv2',
         'openpyxl',
         'pathlib',
         'PIL',
+        'mpl_toolkits',
+        'plotly',
+        'plotly.graph_objects',
+        'plotly.io',
+        'plotly.subplots',
     ],
     hookspath=[],
     hooksconfig={},
@@ -28,7 +38,6 @@ a = Analysis(
     optimize=0,
 )
 pyz = PYZ(a.pure)
-
 exe = EXE(
     pyz,
     a.scripts,
