@@ -1,14 +1,29 @@
-import pandas as pd
-from openpyxl import load_workbook
-import matplotlib.pyplot as plt
-import numpy as np
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                           QHBoxLayout, QComboBox, QLabel, QFrame, QPushButton, QFileDialog, QLineEdit, QMessageBox)
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from PyQt5.QtWidgets import QTabWidget
+import sys
 import os
 from pathlib import Path
 import traceback
+
+# These imports MUST come first, before any other PyQt imports
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QCoreApplication
+# Set this attribute before ANY QApplication or QCoreApplication is created
+QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+
+# Now import other PyQt modules
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, 
+    QHBoxLayout, QComboBox, QLabel, QFrame, QPushButton, 
+    QFileDialog, QLineEdit, QMessageBox, QTabWidget
+)
+
+# Only import these after PyQt imports
+import pandas as pd
+from openpyxl import load_workbook
+import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
+from plotly.subplots import make_subplots
 
 class ZebraBoxGUI(QWidget):
     def __init__(self):
@@ -451,6 +466,11 @@ def calculate_whole_average_sem(df, all_numeric_columns):
     return sem
 
 
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+import matplotlib.pyplot as plt
+
 class GeneVisualizationWindow(QMainWindow):
     def __init__(self, df, group_averages, stimulus_col, error_data, whole_average_sem):
         super().__init__()
@@ -516,7 +536,12 @@ class GeneVisualizationWindow(QMainWindow):
         self.figure = plt.figure(figsize=(12, 8))
         self.canvas = FigureCanvas(self.figure)
         
+        # Add the matplotlib toolbar (this adds zoom, pan, save, etc.)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        # Add the toolbar and canvas to the layout
         main_layout.addWidget(control_panel)
+        main_layout.addWidget(self.toolbar)
         main_layout.addWidget(self.canvas)
         
         # Initial plot
@@ -560,6 +585,9 @@ class GeneVisualizationWindow(QMainWindow):
             if selected_stim == "All Stimuli (Combined)":
                 # Create single plot for all stimuli combined
                 ax = self.figure.add_subplot(111)
+                
+                # Enable grid for easier reading when zooming
+                ax.grid(True, linestyle='--', alpha=0.7)
                 
                 # Use actual time values instead of indices
                 time_points = self.df['Time(sec)'].values if 'Time(sec)' in self.df.columns else np.arange(len(self.df))
@@ -625,7 +653,6 @@ class GeneVisualizationWindow(QMainWindow):
                 ax.set_xlabel('Time (sec)', fontsize=10)
                 ax.set_ylabel('Value', fontsize=10)
                 ax.tick_params(axis='both', labelsize=10)
-                ax.grid(True, alpha=0.3)
                 
                 # Create a single legend with unique entries
                 handles, labels = ax.get_legend_handles_labels()
@@ -648,6 +675,9 @@ class GeneVisualizationWindow(QMainWindow):
                     x_points = stim_data['Time(sec)'].values if 'Time(sec)' in stim_data.columns else np.arange(len(stim_data))
                     
                     ax = self.figure.add_subplot(111)
+                    
+                    # Enable grid for easier reading when zooming
+                    ax.grid(True, linestyle='--', alpha=0.7)
                     
                     # Plot WT average with error bars if it exists
                     if 'WT_Average' in stim_data.columns:
@@ -780,7 +810,6 @@ class GeneVisualizationWindow(QMainWindow):
                     ax.set_xlabel('Time (sec)', fontsize=10)
                     ax.set_ylabel('Value', fontsize=10)
                     ax.tick_params(axis='both', labelsize=10)
-                    ax.grid(True, alpha=0.3)
                     
                     # Create a single legend with unique entries
                     handles, labels = ax.get_legend_handles_labels()
@@ -799,6 +828,59 @@ class GeneVisualizationWindow(QMainWindow):
             print(f"Visualization error: {str(e)}")
             print(traceback.format_exc())
             self.canvas.draw()
+            
+    def add_cursor_coordinates(self):
+        """Add a status bar that shows cursor coordinates when hovering over the plot"""
+        self.statusbar = self.statusBar()
+        
+        def format_coord(x, y):
+            self.statusbar.showMessage(f"Time: {x:.2f} sec, Value: {y:.2f}")
+            return ''
+        
+        for ax in self.figure.get_axes():
+            ax.format_coord = format_coord
+            
+    def add_data_cursor(self):
+        """Add a data cursor that shows the nearest data point when clicking on the plot"""
+        from matplotlib.widgets import Cursor
+        
+        for ax in self.figure.get_axes():
+            # Add crosshair cursor
+            cursor = Cursor(ax, useblit=True, color='red', linewidth=0.5)
+            
+            # Connected event for clicking on data points
+            def on_click(event):
+                if event.inaxes:
+                    # Find the nearest data point
+                    ax = event.inaxes
+                    lines = ax.get_lines()
+                    
+                    if lines:
+                        min_dist = float('inf')
+                        nearest_point = None
+                        nearest_line_label = None
+                        
+                        for line in lines:
+                            data = line.get_data()
+                            x_data, y_data = data[0], data[1]
+                            
+                            for i in range(len(x_data)):
+                                dist = ((x_data[i] - event.xdata)**2 + 
+                                       (y_data[i] - event.ydata)**2)**0.5
+                                
+                                if dist < min_dist:
+                                    min_dist = dist
+                                    nearest_point = (x_data[i], y_data[i])
+                                    nearest_line_label = line.get_label()
+                        
+                        if nearest_point and min_dist < 5:  # Threshold to be close enough
+                            # Show annotation with data point info
+                            self.statusbar.showMessage(
+                                f"{nearest_line_label}: Time = {nearest_point[0]:.2f}, Value = {nearest_point[1]:.2f}"
+                            )
+            
+            # Connect the event
+            self.canvas.mpl_connect('button_press_event', on_click)
         
     def closeEvent(self, event):
         plt.close('all')
@@ -1041,11 +1123,11 @@ def group_matching_columns(file_path):
         raise e
 
 def main():
-    app = QApplication([])
+    # QApplication already has Qt.AA_ShareOpenGLContexts set above
+    app = QApplication(sys.argv)
     window = BehaviorAnalyzer()
     window.setGeometry(100, 100, 1200, 800)
     window.show()
-    app.exec_()
-
+    sys.exit(app.exec_())
 if __name__ == "__main__":
     main()
